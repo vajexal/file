@@ -202,7 +202,7 @@ class BlockingDriver implements Driver
     public function mkdir(string $path, int $mode = 0777, bool $recursive = false): void
     {
         if (!\mkdir($path, $mode, $recursive) && !\is_dir($path)) {
-            throw new FilesystemException(sprintf('Directory "%s" was not created', $path));
+            throw new FilesystemException(\sprintf('Directory "%s" was not created', $path));
         }
     }
 
