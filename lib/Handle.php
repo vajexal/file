@@ -4,35 +4,40 @@ namespace Amp\File;
 
 use Amp\ByteStream\InputStream;
 use Amp\ByteStream\OutputStream;
-use Amp\Promise;
+use Amp\ByteStream\StreamException;
 
-interface Handle extends InputStream, OutputStream {
-    const DEFAULT_READ_LENGTH = 8192;
+interface Handle extends InputStream, OutputStream
+{
+    public const DEFAULT_READ_LENGTH = 8192;
 
     /**
-     * Read $len bytes from the open file handle starting at $offset.
+     * Read `$length` bytes from the open file handle starting at the current offset.
      *
      * @param int $length
-     * @return \Amp\Promise<string|null>
+     *
+     * @return string|null
+     *
+     * @throws StreamException
      */
-    public function read(int $length = self::DEFAULT_READ_LENGTH): Promise;
+    public function read(int $length = self::DEFAULT_READ_LENGTH): ?string;
 
     /**
      * Write $data to the open file handle starting at $offset.
      *
      * @param string $data
-     * @return \Amp\Promise<int>
+     *
+     * @throws StreamException
      */
-    public function write(string $data): Promise;
+    public function write(string $data): void;
 
     /**
      * Write $data to the open file handle and close the handle once the write completes.
      *
      * @param string $data
      *
-     * @return \Amp\Promise<int>
+     * @throws StreamException
      */
-    public function end(string $data = ""): Promise;
+    public function end(string $data = ""): void;
 
     /**
      * Close the file handle.
@@ -40,9 +45,9 @@ interface Handle extends InputStream, OutputStream {
      * Applications are not required to manually close handles -- they will
      * be unloaded automatically when the object is garbage collected.
      *
-     * @return \Amp\Promise
+     * @throws StreamException
      */
-    public function close(): Promise;
+    public function close(): void;
 
     /**
      * Set the handle's internal pointer position.
@@ -55,14 +60,19 @@ interface Handle extends InputStream, OutputStream {
      *
      * @param int $position
      * @param int $whence
-     * @return \Amp\Promise<int> New offset position.
+     *
+     * @return int New offset position.
+     *
+     * @throws StreamException
      */
-    public function seek(int $position, int $whence = \SEEK_SET): Promise;
+    public function seek(int $position, int $whence = \SEEK_SET): int;
 
     /**
      * Return the current internal offset position of the file handle.
      *
      * @return int
+     *
+     * @throws StreamException
      */
     public function tell(): int;
 
@@ -70,6 +80,8 @@ interface Handle extends InputStream, OutputStream {
      * Test for "end-of-file" on the file handle.
      *
      * @return bool
+     *
+     * @throws StreamException
      */
     public function eof(): bool;
 

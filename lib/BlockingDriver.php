@@ -2,15 +2,11 @@
 
 namespace Amp\File;
 
-use Amp\Failure;
-use Amp\Promise;
-use Amp\Success;
-
-class BlockingDriver implements Driver {
-    /**
-     * {@inheritdoc}
-     */
-    public function open(string $path, string $mode): Promise {
+class BlockingDriver implements Driver
+{
+    /** @inheritdoc */
+    public function open(string $path, string $mode): Handle
+    {
         $mode = \str_replace(['b', 't', 'e'], '', $mode);
 
         switch ($mode) {
@@ -31,322 +27,257 @@ class BlockingDriver implements Driver {
         }
 
         if (!$fh = \fopen($path, $mode . 'be')) {
-            return new Failure(new FilesystemException(
-                "Failed opening file handle"
-            ));
+            throw new FilesystemException("Failed opening file handle");
         }
 
-        return new Success(new BlockingHandle($fh, $path, $mode));
+        return new BlockingHandle($fh, $path, $mode);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function stat(string $path): Promise {
+    /** @inheritdoc */
+    public function stat(string $path): ?array
+    {
         if ($stat = StatCache::get($path)) {
-            return new Success($stat);
-        } elseif ($stat = @\stat($path)) {
+            return $stat;
+        }
+
+        if ($stat = @\stat($path)) {
             StatCache::set($path, $stat);
             \clearstatcache(true, $path);
-        } else {
-            $stat = null;
+
+            return $stat;
         }
 
-        return new Success($stat);
+        return null;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function exists(string $path): Promise {
+    /** @inheritdoc */
+    public function exists(string $path): bool
+    {
         if ($exists = @\file_exists($path)) {
             \clearstatcache(true, $path);
         }
 
-        return new Success($exists);
+        return $exists;
     }
 
-    /**
-     * Retrieve the size in bytes of the file at the specified path.
-     *
-     * If the path does not exist or is not a regular file this
-     * function's returned Promise WILL resolve as a failure.
-     *
-     * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
-     */
-    public function size(string $path): Promise {
+    /** @inheritdoc */
+    public function size(string $path): int
+    {
         if (!@\file_exists($path)) {
-            return new Failure(new FilesystemException(
-                "Path does not exist"
-            ));
+            throw new FilesystemException("Path does not exist");
         }
 
         if (!@\is_file($path)) {
-            return new Failure(new FilesystemException(
-                "Path is not a regular file"
-            ));
+            throw new FilesystemException("Path is not a regular file");
         }
 
         if (($size = @\filesize($path)) === false) {
-            return new Failure(new FilesystemException(
-                \error_get_last()["message"]
-            ));
+            throw new FilesystemException(\error_get_last()["message"]);
         }
 
         \clearstatcache(true, $path);
-        return new Success($size);
+
+        return $size;
     }
 
-    /**
-     * Does the specified path exist and is it a directory?
-     *
-     * If the path does not exist the returned Promise will resolve
-     * to FALSE. It will NOT reject with an error.
-     *
-     * @param string $path An absolute file system path
-     * @return \Amp\Promise<bool>
-     */
-    public function isdir(string $path): Promise {
+    /** @inheritdoc */
+    public function isDir(string $path): bool
+    {
         if (!@\file_exists($path)) {
-            return new Success(false);
+            return false;
         }
 
         $isDir = @\is_dir($path);
         \clearstatcache(true, $path);
 
-        return new Success($isDir);
+        return $isDir;
     }
 
-    /**
-     * Does the specified path exist and is it a file?
-     *
-     * If the path does not exist the returned Promise will resolve
-     * to FALSE. It will NOT reject with an error.
-     *
-     * @param string $path An absolute file system path
-     * @return \Amp\Promise<bool>
-     */
-    public function isfile(string $path): Promise {
+    /** @inheritdoc */
+    public function isFile(string $path): bool
+    {
         if (!@\file_exists($path)) {
-            return new Success(false);
+            return false;
         }
 
         $isFile = @\is_file($path);
         \clearstatcache(true, $path);
 
-        return new Success($isFile);
+        return $isFile;
     }
 
-    /**
-     * Retrieve the path's last modification time as a unix timestamp.
-     *
-     * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
-     */
-    public function mtime(string $path): Promise {
+    /** @inheritdoc */
+    public function mtime(string $path): int
+    {
         if (!@\file_exists($path)) {
-            return new Failure(new FilesystemException(
-                "Path does not exist"
-            ));
+            throw new FilesystemException("Path does not exist");
         }
 
         $mtime = @\filemtime($path);
         \clearstatcache(true, $path);
 
-        return new Success($mtime);
+        return $mtime;
     }
 
-    /**
-     * Retrieve the path's last access time as a unix timestamp.
-     *
-     * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
-     */
-    public function atime(string $path): Promise {
+    /** @inheritdoc */
+    public function atime(string $path): int
+    {
         if (!@\file_exists($path)) {
-            return new Failure(new FilesystemException(
-                "Path does not exist"
-            ));
+            throw new FilesystemException("Path does not exist");
         }
+
         $atime = @\fileatime($path);
         \clearstatcache(true, $path);
 
-        return new Success($atime);
+        return $atime;
     }
 
-    /**
-     * Retrieve the path's creation time as a unix timestamp.
-     *
-     * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
-     */
-    public function ctime(string $path): Promise {
+    /** @inheritdoc */
+    public function ctime(string $path): int
+    {
         if (!@\file_exists($path)) {
-            return new Failure(new FilesystemException(
-                "Path does not exist"
-            ));
+            throw new FilesystemException("Path does not exist");
         }
 
         $ctime = @\filectime($path);
         \clearstatcache(true, $path);
 
-        return new Success($ctime);
+        return $ctime;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function lstat(string $path): Promise {
+    /** @inheritdoc */
+    public function lstat(string $path): ?array
+    {
         if ($stat = @\lstat($path)) {
             \clearstatcache(true, $path);
-        } else {
-            $stat = null;
+
+            return $stat;
         }
 
-        return new Success($stat);
+        return null;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function symlink(string $target, string $link): Promise {
+    /** @inheritdoc */
+    public function symlink(string $target, string $link): void
+    {
         if (!@\symlink($target, $link)) {
-            return new Failure(new FilesystemException("Could not create symbolic link"));
+            throw new FilesystemException("Could not create symbolic link");
         }
-
-        return new Success(true);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function link(string $target, string $link): Promise {
+    /** @inheritdoc */
+    public function link(string $target, string $link): void
+    {
         if (!@\link($target, $link)) {
-            return new Failure(new FilesystemException("Could not create hard link"));
+            throw new FilesystemException("Could not create hard link");
         }
-
-        return new Success(true);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function readlink(string $path): Promise {
-        if (!($result = @\readlink($path))) {
-            return new Failure(new FilesystemException("Could not read symbolic link"));
+    /** @inheritdoc */
+    public function readlink(string $path): string
+    {
+        if (false === ($result = @\readlink($path))) {
+            throw new FilesystemException("Could not read symbolic link");
         }
 
-        return new Success($result);
+        return $result;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function rename(string $from, string $to): Promise {
+    /** @inheritdoc */
+    public function rename(string $from, string $to): void
+    {
         if (!@\rename($from, $to)) {
-            return new Failure(new FilesystemException("Could not rename file"));
+            throw new FilesystemException("Could not rename file");
         }
-
-        return new Success(true);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function unlink(string $path): Promise {
+    /** @inheritdoc */
+    public function unlink(string $path): void
+    {
         StatCache::clear($path);
-        return new Success((bool) @\unlink($path));
+        @\unlink($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function mkdir(string $path, int $mode = 0777, bool $recursive = false): Promise {
-        return new Success((bool) @\mkdir($path, $mode, $recursive));
+    /** @inheritdoc */
+    public function mkdir(string $path, int $mode = 0777, bool $recursive = false): void
+    {
+        if (!\mkdir($path, $mode, $recursive) && !\is_dir($path)) {
+            throw new FilesystemException(sprintf('Directory "%s" was not created', $path));
+        }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function rmdir(string $path): Promise {
+    /** @inheritdoc */
+    public function rmdir(string $path): void
+    {
         StatCache::clear($path);
-        return new Success((bool) @\rmdir($path));
+        @\rmdir($path);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function scandir(string $path): Promise {
+    /** @inheritdoc */
+    public function scandir(string $path): array
+    {
         if (!@\is_dir($path)) {
-            return new Failure(new FilesystemException(
-                "Not a directory"
-            ));
-        } elseif ($arr = @\scandir($path)) {
-            $arr = \array_values(\array_filter($arr, function ($el) {
-                return !($el === "." || $el === "..");
-            }));
-            \clearstatcache(true, $path);
-            return new Success($arr);
+            throw new FilesystemException("Not a directory");
         }
 
-        return new Failure(new FilesystemException(
-            "Failed reading contents from {$path}"
-        ));
+        if ($entries = @\scandir($path, SCANDIR_SORT_NONE)) {
+            \clearstatcache(true, $path);
+
+            return \array_values(\array_filter($entries, function ($entry) {
+                return !($entry === "." || $entry === "..");
+            }));
+        }
+
+        throw new FilesystemException("Failed reading contents from {$path}");
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function chmod(string $path, int $mode): Promise {
-        return new Success((bool) @\chmod($path, $mode));
+    /** @inheritdoc */
+    public function chmod(string $path, int $mode): void
+    {
+        @\chmod($path, $mode);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function chown(string $path, int $uid, int $gid): Promise {
+    /** @inheritdoc */
+    public function chown(string $path, int $uid, int $gid): void
+    {
         if ($uid !== -1 && !@\chown($path, $uid)) {
-            return new Failure(new FilesystemException(
-                \error_get_last()["message"]
-            ));
+            throw new FilesystemException(\error_get_last()["message"]);
         }
 
         if ($gid !== -1 && !@\chgrp($path, $gid)) {
-            return new Failure(new FilesystemException(
-                \error_get_last()["message"]
-            ));
+            throw new FilesystemException(\error_get_last()["message"]);
         }
-
-        return new Success;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function touch(string $path, int $time = null, int $atime = null): Promise {
+    /** @inheritdoc */
+    public function touch(string $path, int $time = null, int $atime = null): void
+    {
         $time = $time ?? \time();
         $atime = $atime ?? $time;
-        return new Success((bool) \touch($path, $time, $atime));
+
+        /** @noinspection PotentialMalwareInspection */
+        \touch($path, $time, $atime);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function get(string $path): Promise {
+    /** @inheritdoc */
+    public function get(string $path): string
+    {
         $result = @\file_get_contents($path);
-        return ($result === false)
-            ? new Failure(new FilesystemException(\error_get_last()["message"]))
-            : new Success($result);
+
+        if ($result === false) {
+            throw new FilesystemException(\error_get_last()["message"]);
+        }
+
+        return $result;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function put(string $path, string $contents): Promise {
+    /** @inheritdoc */
+    public function put(string $path, string $contents): void
+    {
         $result = @\file_put_contents($path, $contents);
-        return ($result === false)
-            ? new Failure(new FilesystemException(\error_get_last()["message"]))
-            : new Success($result);
+
+        if ($result === false) {
+            throw new FilesystemException(\error_get_last()["message"]);
+        }
     }
 }

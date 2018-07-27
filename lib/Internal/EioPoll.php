@@ -2,13 +2,12 @@
 
 namespace Amp\File\Internal;
 
-use Amp\CallableMaker;
 use Amp\Loop;
-use Amp\Promise;
+use Concurrent\Awaitable;
+use Concurrent\Deferred;
 
-class EioPoll {
-    use CallableMaker;
-
+class EioPoll
+{
     /** @var resource */
     private static $stream;
 
@@ -21,8 +20,9 @@ class EioPoll {
     /** @var callable */
     private $onDone;
 
-    public function __construct() {
-        $this->onDone = $this->callableFromInstanceMethod("done");
+    public function __construct()
+    {
+        $this->onDone = \Closure::fromCallable([$this, "done"]);
 
         if (!self::$stream) {
             \eio_init();
@@ -40,11 +40,13 @@ class EioPoll {
         Loop::setState(self::class, new class($this->watcher) {
             private $watcher;
 
-            public function __construct(string $watcher) {
+            public function __construct(string $watcher)
+            {
                 $this->watcher = $watcher;
             }
 
-            public function __destruct() {
+            public function __destruct()
+            {
                 Loop::cancel($this->watcher);
 
                 // Ensure there are no active operations anymore. This is a safe-guard as some operations might not be
@@ -55,15 +57,17 @@ class EioPoll {
         });
     }
 
-    public function listen(Promise $promise) {
+    public function listen(Awaitable $awaitable)
+    {
         if ($this->requests++ === 0) {
             Loop::enable($this->watcher);
         }
 
-        $promise->onResolve($this->onDone);
+        Deferred::transform($awaitable, $this->onDone);
     }
 
-    private function done() {
+    private function done()
+    {
         if (--$this->requests === 0) {
             Loop::disable($this->watcher);
         }

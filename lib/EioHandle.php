@@ -4,12 +4,10 @@ namespace Amp\File;
 
 use Amp\ByteStream\ClosedException;
 use Amp\ByteStream\StreamException;
-use Amp\Deferred;
-use Amp\Promise;
-use Amp\Success;
-use function Amp\call;
 
-class EioHandle implements Handle {
+// TODO: Migrate to new API
+class EioHandle implements Handle
+{
     /** @var \Amp\File\Internal\EioPoll */
     private $poll;
 
@@ -40,7 +38,8 @@ class EioHandle implements Handle {
     /** @var \Amp\Promise|null */
     private $closing;
 
-    public function __construct(Internal\EioPoll $poll, $fh, string $path, string $mode, int $size) {
+    public function __construct(Internal\EioPoll $poll, $fh, string $path, string $mode, int $size)
+    {
         $this->poll = $poll;
         $this->fh = $fh;
         $this->path = $path;
@@ -51,10 +50,9 @@ class EioHandle implements Handle {
         $this->queue = new \SplQueue;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function read(int $length = self::DEFAULT_READ_LENGTH): Promise {
+    /** @inheritdoc */
+    public function read(int $length = self::DEFAULT_READ_LENGTH): Promise
+    {
         if ($this->isActive) {
             throw new PendingOperationError;
         }
@@ -79,7 +77,8 @@ class EioHandle implements Handle {
         return $deferred->promise();
     }
 
-    private function onRead(Deferred $deferred, $result, $req) {
+    private function onRead(Deferred $deferred, $result, $req)
+    {
         $this->isActive = false;
 
         if ($result === -1) {
@@ -95,10 +94,9 @@ class EioHandle implements Handle {
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function write(string $data): Promise {
+    /** @inheritdoc */
+    public function write(string $data): Promise
+    {
         if ($this->isActive && $this->queue->isEmpty()) {
             throw new PendingOperationError;
         }
@@ -124,7 +122,8 @@ class EioHandle implements Handle {
         return $promise;
     }
 
-    private function push(string $data): Promise {
+    private function push(string $data): Promise
+    {
         $length = \strlen($data);
 
         $deferred = new Deferred;
@@ -143,10 +142,9 @@ class EioHandle implements Handle {
         return $deferred->promise();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function end(string $data = ""): Promise {
+    /** @inheritdoc */
+    public function end(string $data = ""): Promise
+    {
         return call(function () use ($data) {
             $promise = $this->write($data);
             $this->writable = false;
@@ -158,7 +156,8 @@ class EioHandle implements Handle {
         });
     }
 
-    private function onWrite(Deferred $deferred, $result, $req) {
+    private function onWrite(Deferred $deferred, $result, $req)
+    {
         if ($this->queue->isEmpty()) {
             $deferred->fail(new ClosedException('No pending write, the file may have been closed'));
         }
@@ -185,10 +184,9 @@ class EioHandle implements Handle {
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function close(): Promise {
+    /** @inheritdoc */
+    public function close(): Promise
+    {
         if ($this->closing) {
             return $this->closing;
         }
@@ -201,15 +199,15 @@ class EioHandle implements Handle {
         return $deferred->promise();
     }
 
-    private function onClose(Deferred $deferred, $result, $req) {
+    private function onClose(Deferred $deferred, $result, $req)
+    {
         // Ignore errors when closing file, as the handle will become invalid anyway.
         $deferred->resolve();
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function seek(int $offset, int $whence = \SEEK_SET): Promise {
+    /** @inheritdoc */
+    public function seek(int $offset, int $whence = \SEEK_SET): Promise
+    {
         if ($this->isActive) {
             throw new PendingOperationError;
         }
@@ -233,31 +231,27 @@ class EioHandle implements Handle {
         return new Success($this->position);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function tell(): int {
+    /** @inheritdoc */
+    public function tell(): int
+    {
         return $this->position;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function eof(): bool {
+    /** @inheritdoc */
+    public function eof(): bool
+    {
         return !$this->queue->isEmpty() ? false : ($this->size <= $this->position);
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function path(): string {
+    /** @inheritdoc */
+    public function path(): string
+    {
         return $this->path;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function mode(): string {
+    /** @inheritdoc */
+    public function mode(): string
+    {
         return $this->mode;
     }
 }

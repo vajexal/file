@@ -3,78 +3,72 @@
 namespace Amp\File\Test;
 
 use Amp\File;
+use Concurrent\Task;
 
-abstract class AsyncHandleTest extends HandleTest {
-    /**
-     * @expectedException \Amp\File\PendingOperationError
-     */
-    public function testSimultaneousReads() {
+abstract class AsyncHandleTest extends HandleTest
+{
+    public function testSimultaneousReads(): void
+    {
         $this->execute(function () {
-            /** @var \Amp\File\Handle $handle */
-            $handle = yield File\open(__FILE__, "r");
+            $handle = File\open(__FILE__, "r");
 
-            $promise1 = $handle->read();
-            $promise2 = $handle->read();
+            $awaitable1 = Task::async([$handle, 'read'], 20);
+            $awaitable2 = Task::async([$handle, 'read'], 20);
 
-            $expected = \substr(yield File\get(__FILE__), 0, 20);
-            $this->assertSame($expected, yield $promise1);
+            $expected = \substr(File\get(__FILE__), 0, 20);
+            $this->assertSame($expected, Task::await($awaitable1));
 
-            yield $promise2;
+            $this->expectException(File\PendingOperationError::class);
+            Task::await($awaitable2);
         });
     }
 
-    /**
-     * @expectedException \Amp\File\PendingOperationError
-     */
-    public function testSeekWhileReading() {
+    public function testSeekWhileReading(): void
+    {
         $this->execute(function () {
-            /** @var \Amp\File\Handle $handle */
-            $handle = yield File\open(__FILE__, "r");
+            $handle = File\open(__FILE__, "r");
 
-            $promise1 = $handle->read(10);
-            $promise2 = $handle->seek(0);
+            $awaitable1 = Task::async([$handle, 'read'], 10);
+            $awaitable2 = Task::async([$handle, 'seek'], 0);
 
-            $expected = \substr(yield File\get(__FILE__), 0, 10);
-            $this->assertSame($expected, yield $promise1);
+            $expected = \substr(File\get(__FILE__), 0, 10);
+            $this->assertSame($expected, Task::await($awaitable1));
 
-            yield $promise2;
+            $this->expectException(File\PendingOperationError::class);
+            Task::await($awaitable2);
         });
     }
 
-    /**
-     * @expectedException \Amp\File\PendingOperationError
-     */
-    public function testReadWhileWriting() {
+    public function testReadWhileWriting(): void
+    {
         $this->execute(function () {
-            /** @var \Amp\File\Handle $handle */
-            $handle = yield File\open(__FILE__, "r");
+            $handle = File\open(__FILE__, "r");
 
             $data = "test";
 
-            $promise1 = $handle->write($data);
-            $promise2 = $handle->read(10);
+            $awaitable1 = Task::async([$handle, 'write'], $data);
+            $awaitable2 = Task::async([$handle, 'read'], 10);
 
-            $this->assertSame(\strlen($data), yield $promise1);
+            Task::await($awaitable1);
 
-            yield $promise2;
+            $this->expectException(File\PendingOperationError::class);
+            Task::await($awaitable2);
         });
     }
 
-    /**
-     * @expectedException \Amp\File\PendingOperationError
-     */
-    public function testWriteWhileReading() {
+    public function testWriteWhileReading(): void
+    {
         $this->execute(function () {
-            /** @var \Amp\File\Handle $handle */
-            $handle = yield File\open(__FILE__, "r");
+            $handle = File\open(__FILE__, "r");
 
-            $promise1 = $handle->read(10);
-            $promise2 = $handle->write("test");
+            $awaitable1 = Task::async([$handle, 'read'], 10);
+            $awaitable2 = Task::async([$handle, 'write'], "test");
 
-            $expected = \substr(yield File\get(__FILE__), 0, 10);
-            $this->assertSame($expected, yield $promise1);
+            $expected = \substr(File\get(__FILE__), 0, 10);
+            $this->assertSame($expected, Task::await($awaitable1));
 
-            yield $promise2;
+            $this->expectException(File\PendingOperationError::class);
+            Task::await($awaitable2);
         });
     }
 }

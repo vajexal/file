@@ -2,17 +2,19 @@
 
 namespace Amp\File;
 
-use Amp\Promise;
-
-interface Driver {
+interface Driver
+{
     /**
      * Open a handle for the specified path.
      *
      * @param string $path
      * @param string $mode
-     * @return \Amp\Promise<\Amp\File\Handle>
+     *
+     * @return Handle
+     *
+     * @throws FilesystemException
      */
-    public function open(string $path, string $mode): Promise;
+    public function open(string $path, string $mode): Handle;
 
     /**
      * Execute a file stat operation.
@@ -20,20 +22,22 @@ interface Driver {
      * If the requested path does not exist the resulting Promise will resolve to NULL.
      *
      * @param string $path The file system path to stat
-     * @return \Amp\Promise<array|null>
+     *
+     * @return array|null
      */
-    public function stat(string $path): Promise;
+    public function stat(string $path): ?array;
 
     /**
      * Does the specified path exist?
      *
-     * This function should never resolve as a failure -- only a successfull bool value
+     * This function should never resolve as a failure -- only a successful bool value
      * indicating the existence of the specified path.
      *
      * @param string $path An absolute file system path
-     * @return \Amp\Promise<bool>
+     *
+     * @return bool
      */
-    public function exists(string $path): Promise;
+    public function exists(string $path): bool;
 
     /**
      * Retrieve the size in bytes of the file at the specified path.
@@ -42,9 +46,12 @@ interface Driver {
      * function's returned Promise WILL resolve as a failure.
      *
      * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
+     *
+     * @return int
+     *
+     * @throws FilesystemException
      */
-    public function size(string $path): Promise;
+    public function size(string $path): int;
 
     /**
      * Does the specified path exist and is it a directory?
@@ -53,9 +60,10 @@ interface Driver {
      * to FALSE and will not reject with an error.
      *
      * @param string $path An absolute file system path
-     * @return \Amp\Promise<bool>
+     *
+     * @return bool
      */
-    public function isdir(string $path): Promise;
+    public function isDir(string $path): bool;
 
     /**
      * Does the specified path exist and is it a file?
@@ -64,102 +72,118 @@ interface Driver {
      * to FALSE and will not reject with an error.
      *
      * @param string $path An absolute file system path
-     * @return \Amp\Promise<bool>
+     *
+     * @return bool
      */
-    public function isfile(string $path): Promise;
+    public function isFile(string $path): bool;
 
     /**
      * Retrieve the path's last modification time as a unix timestamp.
      *
      * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
+     *
+     * @return int
+     *
+     * @throws FilesystemException
      */
-    public function mtime(string $path): Promise;
+    public function mtime(string $path): int;
 
     /**
      * Retrieve the path's last access time as a unix timestamp.
      *
      * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
+     *
+     * @return int
+     *
+     * @throws FilesystemException
      */
-    public function atime(string $path): Promise;
+    public function atime(string $path): int;
 
     /**
      * Retrieve the path's creation time as a unix timestamp.
      *
      * @param string $path An absolute file system path
-     * @return \Amp\Promise<int>
+     *
+     * @return int
+     *
+     * @throws FilesystemException
      */
-    public function ctime(string $path): Promise;
+    public function ctime(string $path): int;
 
     /**
      * Same as stat() except if the path is a link then the link's data is returned.
      *
      * @param string $path The file system path to stat
-     * @return \Amp\Promise A promise resolving to an associative array upon successful resolution
+     *
+     * @return array|null An associative array.
      */
-    public function lstat(string $path): Promise;
+    public function lstat(string $path): ?array;
 
     /**
      * Create a symlink $link pointing to the file/directory located at $target.
      *
      * @param string $target
      * @param string $link
-     * @return \Amp\Promise
+     *
+     * @throws FilesystemException
      */
-    public function symlink(string $target, string $link): Promise;
+    public function symlink(string $target, string $link): void;
 
     /**
      * Create a hard link $link pointing to the file/directory located at $target.
      *
      * @param string $target
      * @param string $link
-     * @return \Amp\Promise
+     *
+     * @throws FilesystemException
      */
-    public function link(string $target, string $link): Promise;
+    public function link(string $target, string $link): void;
 
     /**
      * Read the symlink at $path.
      *
      * @param string $target
-     * @return \Amp\Promise
+     *
+     * @return string
+     *
+     * @throws FilesystemException
      */
-    public function readlink(string $target): Promise;
+    public function readlink(string $target): string;
 
     /**
      * Rename a file or directory.
      *
      * @param string $from
      * @param string $to
-     * @return \Amp\Promise
+     *
+     * @throws FilesystemException
      */
-    public function rename(string $from, string $to): Promise;
+    public function rename(string $from, string $to): void;
 
     /**
      * Delete a file.
      *
      * @param string $path
-     * @return \Amp\Promise
      */
-    public function unlink(string $path): Promise;
+    public function unlink(string $path): void;
 
     /**
      * Create a director.
      *
      * @param string $path
-     * @param int $mode
-     * @param bool $recursive
-     * @return \Amp\Promise
+     * @param int    $mode
+     * @param bool   $recursive
+     *
+     * @throws FilesystemException
      */
-    public function mkdir(string $path, int $mode = 0777, bool $recursive = false): Promise;
+    public function mkdir(string $path, int $mode = 0777, bool $recursive = false): void;
 
     /**
      * Delete a directory.
      *
      * @param string $path
-     * @return \Amp\Promise
      */
-    public function rmdir(string $path): Promise;
+    public function rmdir(string $path): void;
 
     /**
      * Retrieve an array of files and directories inside the specified path.
@@ -167,28 +191,29 @@ interface Driver {
      * Dot entries are not included in the resulting array (i.e. "." and "..").
      *
      * @param string $path
-     * @return \Amp\Promise
+     *
+     * @return array
+     *
+     * @throws FilesystemException
      */
-    public function scandir(string $path): Promise;
+    public function scandir(string $path): array;
 
     /**
      * chmod a file or directory.
      *
      * @param string $path
-     * @param int $mode
-     * @return \Amp\Promise
+     * @param int    $mode
      */
-    public function chmod(string $path, int $mode): Promise;
+    public function chmod(string $path, int $mode): void;
 
     /**
      * chown a file or directory.
      *
      * @param string $path
-     * @param int $uid
-     * @param int $gid
-     * @return \Amp\Promise
+     * @param int    $uid
+     * @param int    $gid
      */
-    public function chown(string $path, int $uid, int $gid): Promise;
+    public function chown(string $path, int $uid, int $gid): void;
 
     /**
      * Update the access and modification time of the specified path.
@@ -196,26 +221,29 @@ interface Driver {
      * If the file does not exist it will be created automatically.
      *
      * @param string $path
-     * @param int $time The touch time. If $time is not supplied, the current system time is used.
-     * @param int $atime The access time. If $atime is not supplied, value passed to the $time parameter is used.
-     * @return \Amp\Promise
+     * @param int    $time The touch time. If $time is not supplied, the current system time is used.
+     * @param int    $atime The access time. If $atime is not supplied, value passed to the $time parameter is used.
      */
-    public function touch(string $path, int $time = null, int $atime = null): Promise;
+    public function touch(string $path, int $time = null, int $atime = null): void;
 
     /**
      * Buffer the specified file's contents.
      *
-     * @param string $path The file path from which to buffer contents
-     * @return \Amp\Promise A promise resolving to a string upon successful resolution
+     * @param string $path The file path from which to buffer contents.
+     *
+     * @return string Buffered file contents.
+     *
+     * @throws FilesystemException
      */
-    public function get(string $path): Promise;
+    public function get(string $path): string;
 
     /**
      * Write the contents string to the specified path.
      *
      * @param string $path The file path to which to $contents should be written
      * @param string $contents The data to write to the specified $path
-     * @return \Amp\Promise A promise resolving to the integer length written upon success
+     *
+     * @throws FilesystemException
      */
-    public function put(string $path, string $contents): Promise;
+    public function put(string $path, string $contents): void;
 }

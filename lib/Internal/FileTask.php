@@ -14,8 +14,9 @@ use Amp\Parallel\Worker\Task;
  *
  * @internal
  */
-class FileTask implements Task {
-    const ENV_PREFIX = "amp/file#";
+class FileTask implements Task
+{
+    private const ENV_PREFIX = "amp/file#";
 
     /** @var string */
     private $operation;
@@ -33,8 +34,9 @@ class FileTask implements Task {
      *
      * @throws \Error
      */
-    public function __construct(string $operation, array $args = [], int $id = null) {
-        if (!\strlen($operation)) {
+    public function __construct(string $operation, array $args = [], int $id = null)
+    {
+        if ($operation === '') {
             throw new \Error('Operation must be a non-empty string');
         }
 
@@ -46,10 +48,11 @@ class FileTask implements Task {
     /**
      * {@inheritdoc}
      *
-     * @throws \Amp\File\FilesystemException
+     * @throws FilesystemException
      * @throws \Error
      */
-    public function run(Environment $environment) {
+    public function run(Environment $environment)
+    {
         if ('f' === $this->operation[0]) {
             if ("fopen" === $this->operation) {
                 $path = $this->args[0];
@@ -152,7 +155,8 @@ class FileTask implements Task {
      *
      * @return string
      */
-    private static function makeId(int $id): string {
+    private static function makeId(int $id): string
+    {
         return self::ENV_PREFIX . $id;
     }
 }

@@ -2,13 +2,12 @@
 
 namespace Amp\File\Internal;
 
-use Amp\CallableMaker;
 use Amp\Loop;
-use Amp\Promise;
+use Concurrent\Awaitable;
+use Concurrent\Deferred;
 
-class UvPoll {
-    use CallableMaker;
-
+class UvPoll
+{
     /** @var string */
     private $watcher;
 
@@ -18,8 +17,9 @@ class UvPoll {
     /** @var callable */
     private $onDone;
 
-    public function __construct() {
-        $this->onDone = $this->callableFromInstanceMethod("done");
+    public function __construct()
+    {
+        $this->onDone = \Closure::fromCallable([$this, "done"]);
 
         $this->watcher = Loop::repeat(\PHP_INT_MAX / 2, function () {
             // do nothing, it's a dummy watcher
@@ -30,25 +30,29 @@ class UvPoll {
         Loop::setState(self::class, new class($this->watcher) {
             private $watcher;
 
-            public function __construct(string $watcher) {
+            public function __construct(string $watcher)
+            {
                 $this->watcher = $watcher;
             }
 
-            public function __destruct() {
+            public function __destruct()
+            {
                 Loop::cancel($this->watcher);
             }
         });
     }
 
-    public function listen(Promise $promise) {
+    public function listen(Awaitable $awaitable): void
+    {
         if ($this->requests++ === 0) {
             Loop::enable($this->watcher);
         }
 
-        $promise->onResolve($this->onDone);
+        Deferred::transform($awaitable, $this->onDone);
     }
 
-    private function done() {
+    private function done(): void
+    {
         if (--$this->requests === 0) {
             Loop::disable($this->watcher);
         }

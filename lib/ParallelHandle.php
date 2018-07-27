@@ -4,16 +4,15 @@ namespace Amp\File;
 
 use Amp\ByteStream\ClosedException;
 use Amp\ByteStream\StreamException;
-use Amp\Coroutine;
 use Amp\Parallel\Worker\TaskException;
 use Amp\Parallel\Worker\Worker;
 use Amp\Parallel\Worker\WorkerException;
-use Amp\Promise;
-use Amp\Success;
-use function Amp\call;
+use Concurrent\Awaitable;
+use Concurrent\Task;
 
-class ParallelHandle implements Handle {
-    /** @var \Amp\Parallel\Worker\Worker */
+class ParallelHandle implements Handle
+{
+    /** @var Worker */
     private $worker;
 
     /** @var int|null */
@@ -40,17 +39,18 @@ class ParallelHandle implements Handle {
     /** @var bool */
     private $writable = true;
 
-    /** @var \Amp\Promise|null */
+    /** @var Awaitable|null */
     private $closing;
 
     /**
-     * @param \Amp\Parallel\Worker\Worker $worker
-     * @param int $id
+     * @param Worker $worker
+     * @param int    $id
      * @param string $path
-     * @param int $size
+     * @param int    $size
      * @param string $mode
      */
-    public function __construct(Worker $worker, int $id, string $path, int $size, string $mode) {
+    public function __construct(Worker $worker, int $id, string $path, int $size, string $mode)
+    {
         $this->worker = $worker;
         $this->id = $id;
         $this->path = $path;
@@ -59,47 +59,48 @@ class ParallelHandle implements Handle {
         $this->position = $this->mode[0] === 'a' ? $this->size : 0;
     }
 
-    public function __destruct() {
-        if ($this->id !== null) {
+    public function __destruct()
+    {
+        try {
             $this->close();
+        } catch (\Throwable $e) {
+            // ignore here
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function path(): string {
+    /** @inheritdoc */
+    public function path(): string
+    {
         return $this->path;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function close(): Promise {
+    /** @inheritdoc */
+    public function close(): void
+    {
         if ($this->closing) {
-            return $this->closing;
+            Task::await($this->closing);
+            return;
         }
 
+        $id = $this->id;
+        $this->id = null;
         $this->writable = false;
 
         if ($this->worker->isRunning()) {
-            $this->closing = $this->worker->enqueue(new Internal\FileTask('fclose', [], $this->id));
-            $this->id = null;
-        } else {
-            $this->closing = new Success;
+            $this->closing = Task::async(function () use ($id) {
+                $this->worker->enqueue(new Internal\FileTask('fclose', [], $id));
+            });
         }
-
-        return $this->closing;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function eof(): bool {
+    /** @inheritdoc */
+    public function eof(): bool
+    {
         return $this->pendingWrites === 0 && $this->size <= $this->position;
     }
 
-    public function read(int $length = self::DEFAULT_READ_LENGTH): Promise {
+    public function read(int $length = self::DEFAULT_READ_LENGTH): ?string
+    {
         if ($this->id === null) {
             throw new ClosedException("The file has been closed");
         }
@@ -108,14 +109,10 @@ class ParallelHandle implements Handle {
             throw new PendingOperationError;
         }
 
-        return new Coroutine($this->doRead($length));
-    }
-
-    private function doRead(int $length): \Generator {
         $this->busy = true;
 
         try {
-            $data = yield $this->worker->enqueue(new Internal\FileTask('fread', [$length], $this->id));
+            $data = $this->worker->enqueue(new Internal\FileTask('fread', [$length], $this->id));
             $this->position += \strlen($data);
             return $data;
         } catch (TaskException $exception) {
@@ -127,10 +124,9 @@ class ParallelHandle implements Handle {
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function write(string $data): Promise {
+    /** @inheritdoc */
+    public function write(string $data): void
+    {
         if ($this->id === null) {
             throw new ClosedException("The file has been closed");
         }
@@ -143,30 +139,12 @@ class ParallelHandle implements Handle {
             throw new ClosedException("The file is no longer writable");
         }
 
-        return new Coroutine($this->doWrite($data));
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function end(string $data = ""): Promise {
-        return call(function () use ($data) {
-            $promise = $this->write($data);
-            $this->writable = false;
-
-            // ignore any errors
-            yield Promise\any([$this->close()]);
-
-            return $promise;
-        });
-    }
-
-    private function doWrite(string $data): \Generator {
-        ++$this->pendingWrites;
+        $this->pendingWrites++;
         $this->busy = true;
 
         try {
-            $length = yield $this->worker->enqueue(new Internal\FileTask('fwrite', [$data], $this->id));
+            $length = $this->worker->enqueue(new Internal\FileTask('fwrite', [$data], $this->id));
+            $this->position += $length;
         } catch (TaskException $exception) {
             throw new StreamException("Writing to the file failed", 0, $exception);
         } catch (WorkerException $exception) {
@@ -176,15 +154,18 @@ class ParallelHandle implements Handle {
                 $this->busy = false;
             }
         }
-
-        $this->position += $length;
-        return $length;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function seek(int $offset, int $whence = SEEK_SET): Promise {
+    /** @inheritdoc */
+    public function end(string $data = ""): void
+    {
+        $this->write($data);
+        $this->close();
+    }
+
+    /** @inheritdoc */
+    public function seek(int $offset, int $whence = SEEK_SET): int
+    {
         if ($this->id === null) {
             throw new ClosedException("The file has been closed");
         }
@@ -193,16 +174,12 @@ class ParallelHandle implements Handle {
             throw new PendingOperationError;
         }
 
-        return new Coroutine($this->doSeek($offset, $whence));
-    }
-
-    private function doSeek(int $offset, int $whence) {
         switch ($whence) {
             case \SEEK_SET:
             case \SEEK_CUR:
             case \SEEK_END:
                 try {
-                    $this->position = yield $this->worker->enqueue(
+                    $this->position = $this->worker->enqueue(
                         new Internal\FileTask('fseek', [$offset, $whence], $this->id)
                     );
 
@@ -222,24 +199,21 @@ class ParallelHandle implements Handle {
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function tell(): int {
+    /** @inheritdoc */
+    public function tell(): int
+    {
         return $this->position;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function size(): int {
+    /** @inheritdoc */
+    public function size(): int
+    {
         return $this->size;
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function mode(): string {
+    /** @inheritdoc */
+    public function mode(): string
+    {
         return $this->mode;
     }
 }

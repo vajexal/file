@@ -3,20 +3,18 @@
 namespace Amp\File\Test;
 
 use Amp\File;
-use Amp\Loop;
-use function Amp\asyncCall;
 
-class EioHandleTest extends AsyncHandleTest {
-    protected function execute(callable $cb) {
+class EioHandleTest extends AsyncHandleTest
+{
+    protected function execute(callable $callback): void
+    {
         if (!\extension_loaded("eio")) {
             $this->markTestSkipped(
                 "eio extension not loaded"
             );
         }
 
-        Loop::run(function () use ($cb) {
-            File\filesystem(new File\EioDriver);
-            asyncCall($cb);
-        });
+        File\filesystem(new File\EioDriver);
+        $callback();
     }
 }
