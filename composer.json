@@ -38,7 +38,7 @@
         "amphp/parallel": "^1.2"
     },
     "require-dev": {
-        "ext-eio": "^1",
+        "ext-eio": "^2",
         "ext-uv": "^0.3 || ^0.2",
         "amphp/phpunit-util": "^1.1",
         "phpunit/phpunit": "^8 || ^7",
