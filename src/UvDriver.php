@@ -140,42 +140,32 @@ final class UvDriver implements Driver
         $deferred = new Deferred;
         $this->poll->listen($deferred->promise());
 
+        $callback = function ($stat) use ($deferred, $path): void {
+            if (\is_int($stat)) {
+                $deferred->resolve(null);
+                return;
+            }
+
+            // link is not a valid stat type but returned by the uv extension
+            // change link to nlink
+            if (isset($stat['link'])) {
+                $stat['nlink'] = $stat['link'];
+
+                unset($stat['link']);
+            }
+
+            StatCache::set($path, $stat);
+
+            $deferred->resolve($stat);
+        };
+
         if ($this->priorVersion) {
-            $callback = function ($fh, $stat) use ($deferred, $path): void {
+            $callback = function ($fh, $stat) use ($callback): void {
                 if (empty($fh)) {
-                    $stat = null;
-                } else {
-                    // link is not a valid stat type but returned by the uv extension
-                    // change link to nlink
-                    if (isset($stat['link'])) {
-                        $stat['nlink'] = $stat['link'];
-
-                        unset($stat['link']);
-                    }
-
-                    StatCache::set($path, $stat);
+                    $stat = 0;
                 }
 
-                $deferred->resolve($stat);
-            };
-        } else {
-            $callback = function ($stat) use ($deferred, $path): void {
-                if (\is_int($stat)) {
-                    $deferred->resolve(null);
-                    return;
-                }
-
-                // link is not a valid stat type but returned by the uv extension
-                // change link to nlink
-                if (isset($stat['link'])) {
-                    $stat['nlink'] = $stat['link'];
-
-                    unset($stat['link']);
-                }
-
-                StatCache::set($path, $stat);
-
-                $deferred->resolve($stat);
+                $callback($stat);
             };
         }
 
