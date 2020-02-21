@@ -18,8 +18,10 @@ env:
   - AMP_DEBUG=true
 
 before_install:
-  - phpenv config-rm xdebug.ini || echo "No xdebug config."
-  - travis/install-pcov.sh
+  - if [ "$TRAVIS_PHP_VERSION" != "7.1" ]; then
+      phpenv config-rm xdebug.ini || echo "No xdebug config.";
+      travis/install-pcov.sh;
+    fi
   - travis/install-eio.sh
   - travis/install-uv.sh
   - wget https://github.com/php-coveralls/php-coveralls/releases/download/v2.2.0/php-coveralls.phar
