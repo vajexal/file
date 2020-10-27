@@ -17,7 +17,7 @@ final class StatCache
 
         $watcher = Loop::repeat(1000, function () {
             self::$now = $now = \time();
-            foreach (self::$cache as $path => $expiry) {
+            foreach (self::$timeouts as $path => $expiry) {
                 if ($now > $expiry) {
                     unset(
                         self::$cache[$path],
