@@ -67,6 +67,11 @@ final class StatCache
         self::$timeouts[$path] = self::$now + self::$ttl;
     }
 
+    public static function getTtl(): int
+    {
+        return self::$ttl;
+    }
+
     public static function ttl(int $seconds): void
     {
         self::$ttl = $seconds;

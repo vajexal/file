@@ -8,9 +8,13 @@ use Amp\File\StatCache;
 
 class StatCacheTest extends FilesystemTest
 {
+    private $ttlBackup;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->ttlBackup = StatCache::getTtl();
 
         StatCache::ttl(1);
     }
@@ -19,7 +23,7 @@ class StatCacheTest extends FilesystemTest
     {
         parent::tearDown();
 
-        StatCache::ttl(3);
+        StatCache::ttl($this->ttlBackup);
     }
 
     public function testStatCacheExpiration()
